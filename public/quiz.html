@@ -27,10 +27,9 @@
   <small>LLMが生成したJSON（luck/color/shape/mood）をp5.jsで可視化します。</small>
 
 <script>
-  // 表示パレット（必ずこのどれかになる）
+  
   const PALETTE = ["#FF7A00","#4DA3FF","#B84DFF","#00E5A8","#FF4D6D","#FFD166","#06D6A0","#118AB2"];
 
-  // 初期値（AI結果が返ると上書きされる）
   let data = { fortune:"", luck:0.5, color:"#4DA3FF", shape:"circle", mood:"calm" };
 
   document.getElementById("go").onclick = send;
@@ -41,7 +40,7 @@
   }
 
   function pickFallback(seedText){
-    // 入力文字列から疑似ランダムにパレットを選ぶ（必ず色が変わり得る）
+
     let h = 0;
     for (let i=0;i<seedText.length;i++) h = (h*31 + seedText.charCodeAt(i)) >>> 0;
     return PALETTE[h % PALETTE.length];
@@ -56,19 +55,18 @@
     // luck 0..1
     const luck = clamp01(obj.luck ?? obj.score ?? obj.rate ?? 0.5);
 
-    // color: #RRGGBB のみ許可。違ったらフォールバックで必ず「見える色」
     let color = (obj.color ?? obj.colour ?? "").toString().trim();
     const isHex = /^#[0-9a-fA-F]{6}$/.test(color);
     if (!isHex || !PALETTE.includes(color)) color = pickFallback(seedText);
 
-    // shape
+    
     let shape = (obj.shape ?? "circle").toString().trim();
     if (!["circle","square","wave"].includes(shape)) {
-      // seedで決めて変化を作る
+
       shape = (seedText.length % 3 === 0) ? "wave" : (seedText.length % 3 === 1) ? "square" : "circle";
     }
 
-    // mood
+    
     let mood = (obj.mood ?? "calm").toString().trim();
     if (!["warm","calm","dark","bright"].includes(mood)) mood = "calm";
 
@@ -90,7 +88,6 @@
     .then(j=>{
       const raw = j.data || j;
 
-      // ★ここでAI結果を反映（必ず色と形が出るように補正）
       data = normalize(raw, text);
 
       document.getElementById("fortune").innerText =
@@ -104,7 +101,7 @@
     });
   }
 
-  // p5.js
+
   function setup(){ createCanvas(window.innerWidth, 420); }
   function windowResized(){ resizeCanvas(window.innerWidth, 420); }
 
