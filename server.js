@@ -65,7 +65,7 @@ async function callOpenAI(systemPrompt) {
   const data = await response.json();
   const txt = data?.choices?.[0]?.message?.content ?? "{}";
 
-  // ★ここが重要：配列じゃなくて “オブジェクト” をそのまま返す
+
   let obj;
   try {
     obj = JSON.parse(txt);
@@ -73,12 +73,12 @@ async function callOpenAI(systemPrompt) {
     throw new Error("LLM response JSON parse failed");
   }
 
-  // 足りないキーがあっても落ちないように最低限補完（保険）
+  
   if (!obj || typeof obj !== "object" || Array.isArray(obj)) {
     throw new Error("LLM response is not an object");
   }
 
-  // 期待キーが欠けてたら保険で補完（画面が白固定にならない）
+  
   if (typeof obj.fortune !== "string") obj.fortune = "今日は落ち着いて進めると良い日";
   if (typeof obj.luck !== "number") obj.luck = 0.5;
   if (typeof obj.color !== "string") obj.color = "#ffffff";
