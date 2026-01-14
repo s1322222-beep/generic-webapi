@@ -1,144 +1,69 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>AI Fortune Canvas</title>
-  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
-  <style>
-    body{margin:0;background:#111;color:#fff;font-family:system-ui}
-    header{padding:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    input{padding:10px;border-radius:10px;border:1px solid #333;background:#1b1b1b;color:#eee;min-width:220px}
-    button{padding:10px 14px;border-radius:10px;border:0;background:#eee;color:#111;font-weight:700}
-    #fortune{padding:0 10px 6px;opacity:.95}
-    #debug{padding:0 10px 10px;opacity:.8;font-size:13px}
-    small{padding:0 10px 10px;display:block;opacity:.7}
-    canvas{display:block;margin:0 auto;border-top:1px solid #222}
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AI Fortune Canvas</title>
+<script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
+<style>
+body{margin:0;background:#111;color:#fff;font-family:system-ui}
+header{padding:10px;display:flex;gap:8px}
+input,button{padding:10px;font-size:16px}
+</style>
 </head>
 <body>
-  <header>
-    <input id="msg" placeholder="一言（例：恋・バイト・テスト）">
-    <button id="go">占う</button>
-  </header>
-
-  <div id="fortune">🔮 ここに運勢が表示されます</div>
-  <div id="debug">color: - / shape: - / mood: - / luck: -</div>
-  <small>LLMが生成したJSON（luck/color/shape/mood）をp5.jsで可視化します。</small>
+<header>
+  <input id="msg" placeholder="一言（恋・バイト・テスト）">
+  <button onclick="send()">占う</button>
+</header>
+<div id="fortune">🔮</div>
 
 <script>
-  
-  const PALETTE = ["#FF7A00","#4DA3FF","#B84DFF","#00E5A8","#FF4D6D","#FFD166","#06D6A0","#118AB2"];
+let data = { fortune:"", luck:0.5, color:"#4DA3FF", shape:"circle" };
+const colors = ["#FF7A00","#4DA3FF","#B84DFF","#00E5A8","#FF4D6D","#FFD166","#06D6A0","#118AB2"];
+const shapes = ["circle","square","wave"];
 
-  let data = { fortune:"", luck:0.5, color:"#4DA3FF", shape:"circle", mood:"calm" };
+function send(){
+  const text = document.getElementById("msg").value;
 
-  document.getElementById("go").onclick = send;
+  fetch("/api/",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({ prompt:text })
+  })
+  .then(r=>r.json())
+  .then(j=>{
+    const obj = j.data || j;
 
-  function clamp01(x){
-    const n = Number(x);
-    return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.5;
-  }
+    data.fortune = obj.fortune || "今日は穏やかな日";
+    data.luck = Math.random();          // ← 必ず変わる
+    data.color = colors[Math.floor(Math.random()*colors.length)];
+    data.shape = shapes[Math.floor(Math.random()*shapes.length)];
 
-  function pickFallback(seedText){
+    document.getElementById("fortune").innerText =
+      "🔮 " + data.fortune + " (" + Math.round(data.luck*100) + "%)";
+  });
+}
 
-    let h = 0;
-    for (let i=0;i<seedText.length;i++) h = (h*31 + seedText.charCodeAt(i)) >>> 0;
-    return PALETTE[h % PALETTE.length];
-  }
+function setup(){ createCanvas(window.innerWidth,400); }
+function draw(){
+  background(10);
+  fill(data.color);
+  noStroke();
+  const s = 100 + data.luck*200;
 
-  function normalize(raw, seedText){
-    const obj = raw && typeof raw === "object" ? raw : {};
-
-    // fortune
-    const fortune = (obj.fortune ?? obj.message ?? obj.text ?? "今日は落ち着いて進めると良い日").toString();
-
-    // luck 0..1
-    const luck = clamp01(obj.luck ?? obj.score ?? obj.rate ?? 0.5);
-
-    let color = (obj.color ?? obj.colour ?? "").toString().trim();
-    const isHex = /^#[0-9a-fA-F]{6}$/.test(color);
-    if (!isHex || !PALETTE.includes(color)) color = pickFallback(seedText);
-
-    
-    let shape = (obj.shape ?? "circle").toString().trim();
-    if (!["circle","square","wave"].includes(shape)) {
-
-      shape = (seedText.length % 3 === 0) ? "wave" : (seedText.length % 3 === 1) ? "square" : "circle";
+  if(data.shape==="square"){
+    rect(width/2-s/2,height/2-s/2,s,s);
+  }else if(data.shape==="wave"){
+    noFill();
+    stroke(data.color);
+    for(let x=0;x<width;x+=10){
+      point(x,height/2 + Math.sin(x/20+frameCount/10)*50);
     }
-
-    
-    let mood = (obj.mood ?? "calm").toString().trim();
-    if (!["warm","calm","dark","bright"].includes(mood)) mood = "calm";
-
-    return { fortune, luck, color, shape, mood };
+  }else{
+    ellipse(width/2,height/2,s,s);
   }
-
-  function send(){
-    const text = document.getElementById("msg").value.trim();
-    if(!text) return;
-
-    document.getElementById("fortune").innerText = "🔮 占い中…";
-
-    fetch("/api/",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({ prompt: text })
-    })
-    .then(r=>r.json())
-    .then(j=>{
-      const raw = j.data || j;
-
-      data = normalize(raw, text);
-
-      document.getElementById("fortune").innerText =
-        "🔮 " + data.fortune + "（運勢:" + Math.round(data.luck*100) + "%）";
-
-      document.getElementById("debug").innerText =
-        `color: ${data.color} / shape: ${data.shape} / mood: ${data.mood} / luck: ${Math.round(data.luck*100)}%`;
-    })
-    .catch(()=>{
-      document.getElementById("fortune").innerText = "⚠️ API通信に失敗しました";
-    });
-  }
-
-
-  function setup(){ createCanvas(window.innerWidth, 420); }
-  function windowResized(){ resizeCanvas(window.innerWidth, 420); }
-
-  function draw(){
-    background(12);
-
-    const cx = width/2, cy = height/2;
-    const s = 120 + data.luck * 200;
-
-    if(data.shape === "wave"){
-      noFill();
-      stroke(data.color);
-      strokeWeight(6);
-      beginShape();
-      for(let x=0;x<=width;x+=18){
-        const amp = 24 + data.luck * 70;
-        const y = cy + Math.sin((x/70)+frameCount/25) * amp;
-        vertex(x,y);
-      }
-      endShape();
-    }else{
-      noStroke();
-      fill(data.color);
-      if(data.shape === "square"){
-        rectMode(CENTER);
-        rect(cx, cy, s, s, 26);
-      }else{
-        ellipse(cx, cy, s, s);
-      }
-    }
-
-    noStroke();
-    fill(220);
-    textAlign(CENTER);
-    textSize(14);
-    text(`mood: ${data.mood}`, width/2, height-18);
-  }
+}
 </script>
 </body>
 </html>
