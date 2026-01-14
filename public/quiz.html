@@ -24,7 +24,7 @@
   <small>LLMが生成したJSON（luck/color/shape/mood）をp5.jsで可視化します。</small>
 
 <script>
-  // 初期値（AIが返すと上書きされる）
+  
   let data = { fortune:"", luck:0.5, color:"#ffffff", shape:"circle", mood:"calm" };
 
   document.getElementById("go").onclick = send;
@@ -54,12 +54,10 @@
     fetch("/api/",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      // ★サーバは prompt を受け取る（textでも受け取れるけど promptで送る）
       body:JSON.stringify({ prompt: text })
     })
     .then(r=>r.json())
     .then(j=>{
-      // サーバは {title, data} で返す
       const raw = j.data || j;
       data = normalize(raw);
 
@@ -99,7 +97,6 @@
         rectMode(CENTER);
         rect(cx, cy, s, s, 26);
       }else{
-        // circle（それ以外も全部circle扱い）
         ellipse(cx, cy, s, s);
       }
     }
