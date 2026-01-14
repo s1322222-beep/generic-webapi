@@ -16,17 +16,28 @@
 </style>
 </head>
 <body>
-  <header>
-    <input id="msg" placeholder="一言（例：恋・バイト・テスト）">
-    <button id="go">占う</button>
-  </header>
-  <div id="fortune">🔮 ここに運勢が表示されます</div>
-  <small>入力→LLMがJSON生成→色と形で可視化（p5.js）</small>
+<header>
+  <input id="msg" placeholder="一言（例：恋・バイト・テスト）">
+  <button id="go">占う</button>
+</header>
+<div id="fortune">🔮 ここに運勢が表示されます</div>
+<small>LLMが返すJSONを色と形で可視化します。</small>
 
 <script>
 let data = { fortune:"", luck:0.5, color:"#ffffff", shape:"circle", mood:"calm" };
 
-document.getElementById("go").onclick = () => send();
+document.getElementById("go").onclick = send;
+
+function normalize(obj){
+  // どんなキーでも吸収
+  return {
+    fortune: obj.fortune || obj.message || obj.text || obj.result || "今日は穏やかな一日",
+    luck: Number(obj.luck ?? obj.score ?? obj.rate ?? obj.probability ?? 0.5),
+    color: obj.color || obj.colour || "#ffffff",
+    shape: obj.shape || obj.form || "circle",
+    mood: obj.mood || obj.feel || "calm"
+  };
+}
 
 function send(){
   const text = document.getElementById("msg").value.trim();
@@ -41,15 +52,14 @@ function send(){
   })
   .then(r=>r.json())
   .then(j=>{
-    // ★重要：サーバが {title, data} でも、直でオブジェクトでも両対応
-    data = j.data || j;
+    const raw = j.data || j;
+    data = normalize(raw);
 
-    const luckNum = Number(data.luck);
-    const luck = Number.isFinite(luckNum) ? Math.max(0, Math.min(1, luckNum)) : 0.5;
+    const luck = Number.isFinite(data.luck) ? Math.max(0, Math.min(1, data.luck)) : 0.5;
     data.luck = luck;
 
     document.getElementById("fortune").innerText =
-      "🔮 " + (data.fortune ?? "（運勢の生成に失敗）") + "（運勢:" + Math.round(luck*100) + "%）";
+      "🔮 " + data.fortune + "（運勢:" + Math.round(luck*100) + "%）";
   })
   .catch(()=>{
     document.getElementById("fortune").innerText = "⚠️ API通信に失敗しました";
@@ -64,12 +74,12 @@ function draw(){
   background(12);
 
   const cx = width/2, cy = height/2;
-  const luck = data.luck ?? 0.5;
+  const luck = data.luck;
   const s = 120 + luck * 200;
 
   if(data.shape === "wave"){
     noFill();
-    stroke(data.color || "#fff");
+    stroke(data.color);
     strokeWeight(6);
     beginShape();
     for(let x=0;x<=width;x+=18){
@@ -80,7 +90,7 @@ function draw(){
     endShape();
   }else{
     noStroke();
-    fill(data.color || "#fff");
+    fill(data.color);
     if(data.shape === "square"){
       rectMode(CENTER);
       rect(cx, cy, s, s, 26);
@@ -93,7 +103,7 @@ function draw(){
   fill(220);
   textAlign(CENTER);
   textSize(14);
-  text(`mood: ${data.mood ?? "calm"}`, width/2, height-18);
+  text(`mood: ${data.mood}`, width/2, height-18);
 }
 </script>
 </body>
