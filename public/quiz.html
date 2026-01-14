@@ -34,16 +34,40 @@
     return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.5;
   }
 
-  function normalize(raw){
-    const obj = raw && typeof raw === "object" ? raw : {};
-    return {
-      fortune: (obj.fortune ?? obj.message ?? obj.text ?? "今日は落ち着いて進めると良い日").toString(),
-      luck: clamp01(obj.luck ?? obj.score ?? obj.rate ?? 0.5),
-      color: (obj.color ?? obj.colour ?? "#ffffff").toString(),
-      shape: (obj.shape ?? "circle").toString(),
-      mood: (obj.mood ?? "calm").toString(),
+function normalize(raw){
+  const obj = raw && typeof raw === "object" ? raw : {};
+
+  // 1) fortune
+  const fortune = (obj.fortune ?? obj.message ?? obj.text ?? "今日は落ち着いて進めると良い日").toString();
+
+  // 2) luck 0..1
+  const luck = clamp01(obj.luck ?? obj.score ?? obj.rate ?? 0.5);
+
+  let color = (obj.color ?? obj.colour ?? "").toString().trim();
+  const isHex = /^#[0-9a-fA-F]{6}$/.test(color);
+
+  if (!isHex) {
+    const mood = (obj.mood ?? "calm").toString();
+    const fallback = {
+      warm:  "#FF7A00",
+      calm:  "#4DA3FF",
+      dark:  "#B84DFF",
+      bright:"#00E5A8"
     };
+    color = fallback[mood] || "#4DA3FF";
   }
+
+  // 4) shape
+  let shape = (obj.shape ?? "circle").toString();
+  if (!["circle","square","wave"].includes(shape)) shape = "circle";
+
+  // 5) mood
+  let mood = (obj.mood ?? "calm").toString();
+  if (!["warm","calm","dark","bright"].includes(mood)) mood = "calm";
+
+  return { fortune, luck, color, shape, mood };
+}
+
 
   function send(){
     const text = document.getElementById("msg").value.trim();
