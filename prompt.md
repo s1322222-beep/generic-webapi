@@ -19,3 +19,4 @@ ${text}
 - colorは次からランダムに1つ選ぶ：
 #FF7A00,#4DA3FF,#B84DFF,#00E5A8,#FF4D6D,#FFD166,#06D6A0,#118AB2
 - JSON以外は出力しない
+-
