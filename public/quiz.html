@@ -10,7 +10,8 @@
     header{padding:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
     input{padding:10px;border-radius:10px;border:1px solid #333;background:#1b1b1b;color:#eee;min-width:220px}
     button{padding:10px 14px;border-radius:10px;border:0;background:#eee;color:#111;font-weight:700}
-    #fortune{padding:0 10px 10px;opacity:.95}
+    #fortune{padding:0 10px 6px;opacity:.95}
+    #debug{padding:0 10px 10px;opacity:.8;font-size:13px}
     small{padding:0 10px 10px;display:block;opacity:.7}
     canvas{display:block;margin:0 auto;border-top:1px solid #222}
   </style>
@@ -20,12 +21,17 @@
     <input id="msg" placeholder="一言（例：恋・バイト・テスト）">
     <button id="go">占う</button>
   </header>
-  <div id="fortune">🔮 ここに運勢が表示されます</div>
 
+  <div id="fortune">🔮 ここに運勢が表示されます</div>
+  <div id="debug">color: - / shape: - / mood: - / luck: -</div>
+  <small>LLMが生成したJSON（luck/color/shape/mood）をp5.jsで可視化します。</small>
 
 <script>
-  
-  let data = { fortune:"", luck:0.5, color:"#ffffff", shape:"circle", mood:"calm" };
+  // 表示パレット（必ずこのどれかになる）
+  const PALETTE = ["#FF7A00","#4DA3FF","#B84DFF","#00E5A8","#FF4D6D","#FFD166","#06D6A0","#118AB2"];
+
+  // 初期値（AI結果が返ると上書きされる）
+  let data = { fortune:"", luck:0.5, color:"#4DA3FF", shape:"circle", mood:"calm" };
 
   document.getElementById("go").onclick = send;
 
@@ -34,40 +40,40 @@
     return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.5;
   }
 
-function normalize(raw){
-  const obj = raw && typeof raw === "object" ? raw : {};
-
-  // 1) fortune
-  const fortune = (obj.fortune ?? obj.message ?? obj.text ?? "今日は落ち着いて進めると良い日").toString();
-
-  // 2) luck 0..1
-  const luck = clamp01(obj.luck ?? obj.score ?? obj.rate ?? 0.5);
-
-  let color = (obj.color ?? obj.colour ?? "").toString().trim();
-  const isHex = /^#[0-9a-fA-F]{6}$/.test(color);
-
-  if (!isHex) {
-    const mood = (obj.mood ?? "calm").toString();
-    const fallback = {
-      warm:  "#FF7A00",
-      calm:  "#4DA3FF",
-      dark:  "#B84DFF",
-      bright:"#00E5A8"
-    };
-    color = fallback[mood] || "#4DA3FF";
+  function pickFallback(seedText){
+    // 入力文字列から疑似ランダムにパレットを選ぶ（必ず色が変わり得る）
+    let h = 0;
+    for (let i=0;i<seedText.length;i++) h = (h*31 + seedText.charCodeAt(i)) >>> 0;
+    return PALETTE[h % PALETTE.length];
   }
 
-  // 4) shape
-  let shape = (obj.shape ?? "circle").toString();
-  if (!["circle","square","wave"].includes(shape)) shape = "circle";
+  function normalize(raw, seedText){
+    const obj = raw && typeof raw === "object" ? raw : {};
 
-  // 5) mood
-  let mood = (obj.mood ?? "calm").toString();
-  if (!["warm","calm","dark","bright"].includes(mood)) mood = "calm";
+    // fortune
+    const fortune = (obj.fortune ?? obj.message ?? obj.text ?? "今日は落ち着いて進めると良い日").toString();
 
-  return { fortune, luck, color, shape, mood };
-}
+    // luck 0..1
+    const luck = clamp01(obj.luck ?? obj.score ?? obj.rate ?? 0.5);
 
+    // color: #RRGGBB のみ許可。違ったらフォールバックで必ず「見える色」
+    let color = (obj.color ?? obj.colour ?? "").toString().trim();
+    const isHex = /^#[0-9a-fA-F]{6}$/.test(color);
+    if (!isHex || !PALETTE.includes(color)) color = pickFallback(seedText);
+
+    // shape
+    let shape = (obj.shape ?? "circle").toString().trim();
+    if (!["circle","square","wave"].includes(shape)) {
+      // seedで決めて変化を作る
+      shape = (seedText.length % 3 === 0) ? "wave" : (seedText.length % 3 === 1) ? "square" : "circle";
+    }
+
+    // mood
+    let mood = (obj.mood ?? "calm").toString().trim();
+    if (!["warm","calm","dark","bright"].includes(mood)) mood = "calm";
+
+    return { fortune, luck, color, shape, mood };
+  }
 
   function send(){
     const text = document.getElementById("msg").value.trim();
@@ -83,10 +89,15 @@ function normalize(raw){
     .then(r=>r.json())
     .then(j=>{
       const raw = j.data || j;
-      data = normalize(raw);
+
+      // ★ここでAI結果を反映（必ず色と形が出るように補正）
+      data = normalize(raw, text);
 
       document.getElementById("fortune").innerText =
         "🔮 " + data.fortune + "（運勢:" + Math.round(data.luck*100) + "%）";
+
+      document.getElementById("debug").innerText =
+        `color: ${data.color} / shape: ${data.shape} / mood: ${data.mood} / luck: ${Math.round(data.luck*100)}%`;
     })
     .catch(()=>{
       document.getElementById("fortune").innerText = "⚠️ API通信に失敗しました";
@@ -105,7 +116,7 @@ function normalize(raw){
 
     if(data.shape === "wave"){
       noFill();
-      stroke(data.color || "#fff");
+      stroke(data.color);
       strokeWeight(6);
       beginShape();
       for(let x=0;x<=width;x+=18){
@@ -116,7 +127,7 @@ function normalize(raw){
       endShape();
     }else{
       noStroke();
-      fill(data.color || "#fff");
+      fill(data.color);
       if(data.shape === "square"){
         rectMode(CENTER);
         rect(cx, cy, s, s, 26);
