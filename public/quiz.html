@@ -2,52 +2,98 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AI Fortune Canvas</title>
 <script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
 <style>
-body{margin:0;background:#111;color:#fff;font-family:sans-serif}
-input,button{padding:10px;font-size:16px}
-header{padding:10px}
+  body{margin:0;background:#111;color:#fff;font-family:system-ui}
+  header{padding:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  input{padding:10px;border-radius:10px;border:1px solid #333;background:#1b1b1b;color:#eee;min-width:220px}
+  button{padding:10px 14px;border-radius:10px;border:0;background:#eee;color:#111;font-weight:700}
+  #fortune{padding:0 10px 10px;opacity:.95}
+  small{padding:0 10px 10px;display:block;opacity:.7}
+  canvas{display:block;margin:0 auto;border-top:1px solid #222}
 </style>
 </head>
 <body>
-<header>
-<input id="msg" placeholder="一言（例：恋・バイト・テスト）">
-<button onclick="send()">占う</button>
-<div id="fortune"></div>
-</header>
+  <header>
+    <input id="msg" placeholder="一言（例：恋・バイト・テスト）">
+    <button id="go">占う</button>
+  </header>
+  <div id="fortune">🔮 ここに運勢が表示されます</div>
+  <small>入力→LLMがJSON生成→色と形で可視化（p5.js）</small>
 
 <script>
-let data = {color:"#fff",shape:"circle",luck:0.5,fortune:""};
+let data = { fortune:"", luck:0.5, color:"#ffffff", shape:"circle", mood:"calm" };
+
+document.getElementById("go").onclick = () => send();
 
 function send(){
-  const text = document.getElementById("msg").value;
+  const text = document.getElementById("msg").value.trim();
+  if(!text) return;
+
+  document.getElementById("fortune").innerText = "🔮 占い中…";
+
   fetch("/api/",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({text})
+    body:JSON.stringify({ text })
   })
   .then(r=>r.json())
   .then(j=>{
-    data=j;
+    // ★重要：サーバが {title, data} でも、直でオブジェクトでも両対応
+    data = j.data || j;
+
+    const luckNum = Number(data.luck);
+    const luck = Number.isFinite(luckNum) ? Math.max(0, Math.min(1, luckNum)) : 0.5;
+    data.luck = luck;
+
     document.getElementById("fortune").innerText =
-      "🔮 "+j.fortune+" ("+Math.round(j.luck*100)+"%)";
+      "🔮 " + (data.fortune ?? "（運勢の生成に失敗）") + "（運勢:" + Math.round(luck*100) + "%）";
+  })
+  .catch(()=>{
+    document.getElementById("fortune").innerText = "⚠️ API通信に失敗しました";
   });
 }
 
-function setup(){
-  createCanvas(window.innerWidth,400);
-}
+// p5.js
+function setup(){ createCanvas(window.innerWidth, 420); }
+function windowResized(){ resizeCanvas(window.innerWidth, 420); }
+
 function draw(){
-  background(10);
-  fill(data.color);
-  noStroke();
-  const s = 100 + data.luck*200;
-  if(data.shape==="square"){
-    rect(width/2-s/2,height/2-s/2,s,s,20);
+  background(12);
+
+  const cx = width/2, cy = height/2;
+  const luck = data.luck ?? 0.5;
+  const s = 120 + luck * 200;
+
+  if(data.shape === "wave"){
+    noFill();
+    stroke(data.color || "#fff");
+    strokeWeight(6);
+    beginShape();
+    for(let x=0;x<=width;x+=18){
+      const amp = 24 + luck * 70;
+      const y = cy + Math.sin((x/70)+frameCount/25) * amp;
+      vertex(x,y);
+    }
+    endShape();
   }else{
-    ellipse(width/2,height/2,s,s);
+    noStroke();
+    fill(data.color || "#fff");
+    if(data.shape === "square"){
+      rectMode(CENTER);
+      rect(cx, cy, s, s, 26);
+    }else{
+      ellipse(cx, cy, s, s);
+    }
   }
+
+  noStroke();
+  fill(220);
+  textAlign(CENTER);
+  textSize(14);
+  text(`mood: ${data.mood ?? "calm"}`, width/2, height-18);
 }
 </script>
 </body>
