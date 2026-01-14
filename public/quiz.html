@@ -45,11 +45,14 @@ function send(){
 
   document.getElementById("fortune").innerText = "🔮 占い中…";
 
-  fetch("/api/",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({ text })
+fetch("/api/", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    prompt: text
   })
+})
+
   .then(r=>r.json())
   .then(j=>{
     const raw = j.data || j;
